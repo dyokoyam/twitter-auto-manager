@@ -1,0 +1,28 @@
+﻿name: Desktop CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/setup-rust
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint (desktop)
+        continue-on-error: true
+        run: npm run lint -w apps/desktop
+      - name: Build shared
+        run: npm run build:shared
+      - name: Type check (desktop)
+        run: npx tsc -p apps/desktop/tsconfig.json --noEmit
+      - name: Build desktop
+        run: npm run build -w apps/desktop
+
+
+

@@ -1,0 +1,11 @@
+name: "Setup Node"
+description: "Setup Node.js with caching"
+runs:
+  using: "composite"
+  steps:
+    - name: Use Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: npm
+

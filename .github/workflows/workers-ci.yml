@@ -1,0 +1,26 @@
+﻿name: Workers CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node
+      - name: Install
+        run: npm ci
+      - name: Lint (workers)
+        run: npm run lint -w apps/workers/twitter
+      - name: Type check
+        run: npx tsc -p apps/workers/twitter/tsconfig.json --noEmit
+      - name: Build shared and workers
+        run: |
+          npm run build:shared
+          npm run build:workers
+
+
+

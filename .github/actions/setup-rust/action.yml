@@ -1,0 +1,8 @@
+name: "Setup Rust"
+description: "Setup Rust toolchain"
+runs:
+  using: "composite"
+  steps:
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+

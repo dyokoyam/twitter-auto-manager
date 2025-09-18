@@ -1,0 +1,7 @@
+﻿{
+  "version": "1.0",
+  "bots": [
+    { "account": { "account_name": "example", "status": "active" }, "scheduled_content_list": "[\"hello\"]", "current_index": 0, "scheduled_times": "09:00" }
+  ],
+  "reply_settings": []
+}
