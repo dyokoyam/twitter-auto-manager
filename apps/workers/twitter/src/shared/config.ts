@@ -1,7 +1,6 @@
-﻿import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { z } from "zod";
 import { ActionsConfigSchema, type ActionsConfig } from "@tam/shared";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,20 +14,25 @@ export const runtime = {
 } as const;
 
 export function loadConfig(): ActionsConfig | null {
-  if (!existsSync(runtime.configPath)) return null;
+  if (!existsSync(runtime.configPath)) {
+    return null;
+  }
+
   const raw = JSON.parse(readFileSync(runtime.configPath, "utf8"));
   const parsed = ActionsConfigSchema.safeParse(raw);
-  if (!parsed.success) return null;
-  return parsed.data;
+  return parsed.success ? parsed.data : null;
 }
 
 export function saveConfig(cfg: ActionsConfig): boolean {
+  if (runtime.dryRun) {
+    return true;
+  }
+
   try {
-    if (runtime.dryRun) return true;
     writeFileSync(runtime.configPath, JSON.stringify(cfg, null, 2), "utf8");
     return true;
-  } catch {
+  } catch (error) {
+    console.error(`Failed to write GitHub config: ${(error as Error).message}`);
     return false;
   }
 }
-

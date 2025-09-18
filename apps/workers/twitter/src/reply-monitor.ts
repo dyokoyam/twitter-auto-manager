@@ -1,151 +1,173 @@
 #!/usr/bin/env node
 
-import { runtime as config, loadConfig, saveConfig } from './shared/config.js';
-import { logger as log } from './shared/logger.js';
-import { createTwitterClient } from './shared/twitter-client.js';
+import { runtime as config, loadConfig, saveConfig } from "./shared/config.js";
+import { logger as log } from "./shared/logger.js";
+import { createTwitterClient } from "./shared/twitter-client.js";
+
+type BotAccount = {
+  id?: number | string;
+  account_name: string;
+  status?: string;
+};
+
+type ReplySetting = {
+  reply_bot_id: number | string;
+  target_bot_ids: string;
+  reply_content: string;
+  last_checked_tweet_ids?: string | null;
+};
+
+const PAUSE_MS = 1000;
 
 function getJapanTime(): string {
-  return new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date().toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
-function getBotAccountById(configData: any, botId: number | string) {
-  const id = parseInt(String(botId));
-  const bot = (configData.bots || []).find((b: any) => parseInt(String(b?.account?.id)) === id);
-  return bot?.account || null;
+function findAccount(configData: any, targetId: number | string): BotAccount | null {
+  const id = Number(targetId);
+  if (Number.isNaN(id)) return null;
+  const match = (configData.bots || []).find((entry: any) => Number(entry?.account?.id) === id);
+  return match?.account ?? null;
 }
 
-function getBotNameById(configData: any, botId: number | string) {
-  const acc = getBotAccountById(configData, botId);
-  return acc?.account_name || `Bot_${botId}`;
-}
-
-function parseLastCheckedMap(setting: any): Map<string, string> {
+function parseLastCheckedMap(setting: ReplySetting): Map<string, string> {
   const map = new Map<string, string>();
-  const raw = setting.last_checked_tweet_ids;
-  if (!raw) return map;
+  if (!setting.last_checked_tweet_ids) return map;
   try {
-    const arr = JSON.parse(raw) as string[];
-    for (const entry of arr) {
-      const [k, v] = String(entry).split(':');
-      if (k && v) map.set(k, v);
+    const entries = JSON.parse(setting.last_checked_tweet_ids) as string[];
+    for (const token of entries) {
+      const [key, value] = String(token).split(":");
+      if (key && value) map.set(key, value);
     }
-  } catch {}
+  } catch (error) {
+    log.warn(`Failed to parse last_checked_tweet_ids: ${(error as Error).message}`);
+  }
   return map;
 }
 
-function serializeLastCheckedMap(m: Map<string, string>): string {
-  const out: string[] = [];
-  for (const [k, v] of m.entries()) out.push(`${k}:${v}`);
-  return JSON.stringify(out);
+function serializeLastCheckedMap(map: Map<string, string>): string {
+  return JSON.stringify([...map.entries()].map(([key, value]) => `${key}:${value}`));
 }
 
 async function postReply(client: any, content: string, tweetId: string, botName: string) {
+  if (config.dryRun) {
+    log.info(`[DRY RUN] Would reply for ${botName} to ${tweetId}: "${content}"`);
+    return { success: true };
+  }
+
   try {
-    if (config.dryRun) {
-      log.info(`[DRY RUN] Would reply for ${botName} to ${tweetId}: "${content}"`);
-      return { data: { id: 'dry_run_reply_' + Date.now(), text: content }, success: true };
-    }
     const response = await client.v2.tweet(content, { reply: { in_reply_to_tweet_id: tweetId } });
-    if (response?.data) {
-      log.info(`✁EReplied for ${botName}: ${response.data.id}`);
-      return { ...response, success: true };
-    }
-    throw new Error('No data in response');
-  } catch (e: any) {
-    log.error(`Failed to post reply for ${botName}: ${e?.message}`);
-    return { success: false, error: e?.message };
+    if (!response?.data) throw new Error("No data in response");
+    log.info(`✉️ Replied for ${botName}: ${response.data.id}`);
+    return { success: true };
+  } catch (error: any) {
+    log.error(`Failed to post reply for ${botName}: ${error?.message}`);
+    return { success: false };
   }
 }
 
-async function getUserTweets(client: any, username: string, sinceId?: string | null) {
+async function getLatestTweetId(client: any, username: string, sinceId?: string | null): Promise<string | null> {
+  if (config.dryRun) {
+    return sinceId ? null : `dry_run_tweet_${Date.now()}`;
+  }
+
   try {
-    if (config.dryRun) {
-      return { data: sinceId ? [] : [{ id: 'dry_run_tweet_' + Date.now(), text: 'dry run', created_at: new Date().toISOString() }], success: true };
-    }
     const userResponse = await client.v2.userByUsername(username);
-    if (!userResponse?.data) throw new Error(`User ${username} not found`);
-    const userId = userResponse.data.id;
-    const options: any = { max_results: 5, 'tweet.fields': ['created_at', 'conversation_id', 'author_id'], exclude: 'retweets,replies' };
+    if (!userResponse?.data) {
+      log.warn(`User ${username} not found`);
+      return null;
+    }
+
+    const options: Record<string, unknown> = {
+      max_results: 5,
+      "tweet.fields": ["created_at", "conversation_id", "author_id"],
+      exclude: "retweets,replies",
+    };
     if (sinceId) options.since_id = sinceId;
-    const tweetsResponse = await client.v2.userTimeline(userId, options);
-    const tweets: any[] = tweetsResponse?.data?.data || tweetsResponse?.data || [];
-    return { data: tweets, success: true };
-  } catch (e: any) {
-    log.error(`Failed fetching tweets for ${username}: ${e?.message}`);
-    return { data: [], success: false };
+
+    const timeline = await client.v2.userTimeline(userResponse.data.id, options);
+    const tweets: any[] = timeline?.data?.data ?? timeline?.data ?? [];
+    return tweets.length > 0 ? String(tweets[0]?.id ?? "") : null;
+  } catch (error: any) {
+    log.error(`Failed fetching tweets for ${username}: ${error?.message}`);
+    return null;
   }
 }
 
 async function processReplies(configData: any) {
+  const settings = (configData.reply_settings || []).filter((item: ReplySetting & { is_active?: boolean }) => item?.is_active);
+
   let successCount = 0;
   let errorCount = 0;
   let configUpdated = false;
 
-  const settings = (configData.reply_settings || []).filter((s: any) => s?.is_active);
-  for (let i = 0; i < settings.length; i++) {
-    const setting = settings[i];
-    try {
-      const replyBotAccount = getBotAccountById(configData, setting.reply_bot_id);
-      if (!replyBotAccount) continue;
-      const replyClient = createTwitterClient(replyBotAccount);
+  for (const setting of settings) {
+    const replyBot = findAccount(configData, setting.reply_bot_id);
+    if (!replyBot || replyBot.status === "inactive") continue;
 
-      const targetIds: number[] = JSON.parse(setting.target_bot_ids || '[]');
-      const lastMap = parseLastCheckedMap(setting);
-      for (const targetId of targetIds) {
-        const targetAcc = getBotAccountById(configData, targetId);
-        if (!targetAcc) continue;
-        const sinceId = lastMap.get(String(targetId));
-        const tweets = await getUserTweets(replyClient, targetAcc.account_name, sinceId);
-        if (tweets.data && tweets.data.length > 0) {
-          const latest = tweets.data[0];
-          const res = await postReply(replyClient, setting.reply_content, latest.id, replyBotAccount.account_name);
-          if (res.success) {
-            successCount++;
-            lastMap.set(String(targetId), String(latest.id));
-            configUpdated = true;
-          } else {
-            errorCount++;
-          }
-        }
-        await new Promise((r) => setTimeout(r, 1000));
+    const replyClient = createTwitterClient(replyBot);
+    const targets: number[] = JSON.parse(setting.target_bot_ids || "[]");
+    const lastMap = parseLastCheckedMap(setting);
+
+    for (const targetId of targets) {
+      const targetAccount = findAccount(configData, targetId);
+      if (!targetAccount) continue;
+
+      const sinceId = lastMap.get(String(targetId));
+      const latestId = await getLatestTweetId(replyClient, targetAccount.account_name, sinceId);
+      if (!latestId || latestId === sinceId) continue;
+
+      const result = await postReply(replyClient, setting.reply_content, latestId, replyBot.account_name);
+      if (result.success) {
+        successCount++;
+        lastMap.set(String(targetId), latestId);
+        configUpdated = true;
+      } else {
+        errorCount++;
       }
 
-      if (configUpdated) {
-        setting.last_checked_tweet_ids = serializeLastCheckedMap(lastMap);
-      }
-    } catch (e: any) {
-      errorCount++;
-      log.error(`Error processing reply setting: ${e?.message}`);
+      await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
     }
-    await new Promise((r) => setTimeout(r, 1000));
+
+    if (configUpdated) {
+      setting.last_checked_tweet_ids = serializeLastCheckedMap(lastMap);
+    }
   }
 
   if (configUpdated) {
-    log.info('💾 Saving updated reply settings...');
+    log.info("💾 Saving updated reply settings...");
     saveConfig(configData);
   }
+
   return { successCount, errorCount };
 }
 
 async function main() {
-  log.info('🚀 Starting Twitter Auto Manager - REPLY MONITOR (TS)');
-  log.info(`📊 Env: ${process.env.NODE_ENV || 'production'} | Dry run: ${config.dryRun}`);
+  log.info("🚀 Starting Twitter Auto Manager - REPLY MONITOR (TS)");
+  log.info(`📊 Env: ${process.env.NODE_ENV || "production"} | Dry run: ${config.dryRun}`);
   log.info(`⏰ JST time: ${getJapanTime()}`);
 
   const cfg = loadConfig();
   if (!cfg) {
-    log.error('No configuration found');
+    log.error("No configuration found");
     process.exit(1);
     return;
   }
 
-  const res = await processReplies(cfg);
-  log.info(`💬 Result: ${res.successCount} success, ${res.errorCount} errors`);
-  if (res.errorCount > 0) process.exit(1);
+  const result = await processReplies(cfg);
+  log.info(`💬 Result: ${result.successCount} success, ${result.errorCount} errors`);
+  if (result.errorCount > 0) process.exit(1);
 }
 
-main().catch((e) => {
-  log.error(`💥 Script failed: ${e?.message}`);
+main().catch((error: any) => {
+  log.error(`💥 Script failed: ${error?.message}`);
   process.exit(1);
 });
-
