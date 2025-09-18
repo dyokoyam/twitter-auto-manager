@@ -3,7 +3,7 @@
     "private":  true,
     "version":  "0.1.0",
     "type":  "module",
-    "description":  "Twitter Bot 閾ｪ蜍慕ｮ｡逅・ヤ繝ｼ繝ｫ",
+    "description":  "Twitter Bot 閾�E�蜍�E�E��E�送E�Eヤ繝ｼ繝ｫ",
     "author":  "Your Name",
     "license":  "MIT",
     "scripts":  {
@@ -63,3 +63,4 @@
                      "scheduled-posting"
                  ]
 }
+

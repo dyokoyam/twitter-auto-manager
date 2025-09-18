@@ -1,5 +1,5 @@
-﻿import type { ActionsConfig } from "@tam/shared";
-import { logger } from "./logger";
+import type { ActionsConfig } from "@tam/shared";
+import { logger } from "./logger.js";
 
 export function updatePostIndexWithMemory(configData: ActionsConfig, botIndex: number, memory: Map<string, number>, accountName: string): boolean {
   const botConfig: any = (configData as any).bots[botIndex];

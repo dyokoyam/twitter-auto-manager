@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { runtime as config, loadConfig, saveConfig } from './shared/config';
-import { logger as log } from './shared/logger';
-import { createTwitterClient } from './shared/twitter-client';
+import { runtime as config, loadConfig, saveConfig } from './shared/config.js';
+import { logger as log } from './shared/logger.js';
+import { createTwitterClient } from './shared/twitter-client.js';
 
 function getJapanTime(): string {
   return new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -47,7 +47,7 @@ async function postReply(client: any, content: string, tweetId: string, botName:
     }
     const response = await client.v2.tweet(content, { reply: { in_reply_to_tweet_id: tweetId } });
     if (response?.data) {
-      log.info(`✅ Replied for ${botName}: ${response.data.id}`);
+      log.info(`✁EReplied for ${botName}: ${response.data.id}`);
       return { ...response, success: true };
     }
     throw new Error('No data in response');

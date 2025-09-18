@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { runtime as config, loadConfig, saveConfig } from './shared/config';
-import { logger as log } from './shared/logger';
-import { createTwitterClient } from './shared/twitter-client';
-import { updatePostIndexWithMemory } from './shared/persistence';
+import { runtime as config, loadConfig, saveConfig } from './shared/config.js';
+import { logger as log } from './shared/logger.js';
+import { createTwitterClient } from './shared/twitter-client.js';
+import { updatePostIndexWithMemory } from './shared/persistence.js';
 
 function getJapanTime(): string {
   return new Date().toLocaleString('ja-JP', {
@@ -68,7 +68,7 @@ async function postTweet(client: any, content: string, botName: string) {
     }
     const res = await client.v2.tweet(content);
     if (res?.data) {
-      log.info(`✅ Posted tweet for ${botName}: ${res.data.id}`);
+      log.info(`✁EPosted tweet for ${botName}: ${res.data.id}`);
       return { ...res, success: true };
     }
     throw new Error('No data in response');
