@@ -16,7 +16,6 @@ function ExecutionLogs() {
   const [logsPerPage] = useState(50);
 
   useEffect(() => {
-    console.log('ExecutionLogs component mounted');
     fetchData();
     
     // 30秒ごとにログを更新
@@ -35,12 +34,10 @@ function ExecutionLogs() {
   const fetchLogs = async () => {
     setIsLoading(true);
     try {
-      console.log('Fetching execution logs...');
       const logData = await invoke('get_execution_logs', { 
         accountId: null, 
         limit: 500 
       });
-      console.log('Logs fetched:', logData);
       setLogs(logData || []);
     } catch (error) {
       console.error('Failed to fetch logs:', error);
@@ -52,9 +49,7 @@ function ExecutionLogs() {
 
   const fetchBotAccounts = async () => {
     try {
-      console.log('Fetching bot accounts for filter...');
       const accounts = await invoke('get_bot_accounts');
-      console.log('Bot accounts for filter:', accounts);
       setBotAccounts(accounts || []);
     } catch (error) {
       console.error('Failed to fetch bot accounts:', error);
@@ -130,7 +125,6 @@ function ExecutionLogs() {
   const openTweet = (tweetId, twitterUsername) => {
     if (tweetId && twitterUsername) {
       const url = `https://twitter.com/${twitterUsername}/status/${tweetId}`;
-      console.log('Opening tweet URL (simple version):', url);
       // シンプル版：window.openを使用
       window.open(url, '_blank');
     }
@@ -144,12 +138,6 @@ function ExecutionLogs() {
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-  console.log('ExecutionLogs render state:', {
-    isLoading,
-    logsCount: logs.length,
-    filteredLogsCount: filteredLogs.length,
-    botAccountsCount: botAccounts.length
-  });
 
   return (
     <div className="page-container">

@@ -23,7 +23,6 @@ function App() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('App useEffect triggered');
     fetchDashboardData();
     
     // 30秒ごとに統計情報を更新
@@ -34,15 +33,12 @@ function App() {
   const fetchDashboardData = async () => {
     try {
       setError(null);
-      console.log('Fetching dashboard data...');
       
       const [stats, settings] = await Promise.all([
         invoke('get_dashboard_stats'),
         invoke('get_user_settings')
       ]);
       
-      console.log('Dashboard stats:', stats);
-      console.log('User settings:', settings);
       
       setDashboardStats(stats);
       setUserSettings(settings);
@@ -62,7 +58,6 @@ function App() {
     }
   };
 
-  console.log('App render - isLoading:', isLoading, 'error:', error, 'userSettings:', userSettings);
 
   if (isLoading) {
     return (

@@ -20,7 +20,6 @@ function Settings({ userSettings, onSettingsUpdate }) {
     logLevel: 'info'
   });
 
-  console.log('Settings component rendered with userSettings:', userSettings);
 
   // ダイアログでエクスポート先を選択
   const selectExportPath = async () => {
@@ -106,7 +105,6 @@ function Settings({ userSettings, onSettingsUpdate }) {
     setMessage(null);
     
     try {
-      console.log('Exporting data to:', exportPath);
       await invoke('export_data', { path: exportPath });
       setMessage({ 
         type: 'success', 
@@ -131,7 +129,6 @@ function Settings({ userSettings, onSettingsUpdate }) {
     setMessage(null);
     
     try {
-      console.log('Exporting GitHub config to:', gitHubExportPath);
       await invoke('export_github_config', { path: gitHubExportPath });
       setMessage({ 
         type: 'success', 
@@ -160,7 +157,6 @@ function Settings({ userSettings, onSettingsUpdate }) {
     setMessage(null);
     
     try {
-      console.log('Importing data from:', importPath);
       // TODO: インポート機能の実装が必要
       // await invoke('import_data', { path: importPath });
       setMessage({ 
@@ -178,7 +174,6 @@ function Settings({ userSettings, onSettingsUpdate }) {
   };
 
   const handleSettingsChange = (key, value) => {
-    console.log(`App setting changed: ${key} = ${value}`);
     setAppSettings(prev => ({
       ...prev,
       [key]: value
@@ -187,7 +182,6 @@ function Settings({ userSettings, onSettingsUpdate }) {
 
   const saveAppSettings = async () => {
     try {
-      console.log('Saving app settings:', appSettings);
       // TODO: アプリケーション設定の保存機能
       setMessage({ type: 'success', text: '設定を保存しました' });
     } catch (error) {

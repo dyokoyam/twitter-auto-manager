@@ -4,8 +4,6 @@ import { FaPlus, FaReply, FaTrash, FaPlay, FaPause, FaCog, FaTwitter, FaKey, FaR
 import './BotManagement.css';
 
 function BotManagement({ onUpdate, userSettings }) {
-  console.log('BotManagement rendering - NEW REPLY SPEC VERSION');
-  console.log('userSettings:', userSettings);
   
   const [botAccounts, setBotAccounts] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,35 +53,28 @@ function BotManagement({ onUpdate, userSettings }) {
   });
 
   useEffect(() => {
-    console.log('useEffect triggered - fetching bot accounts');
     fetchBotAccounts();
     fetchReplySettings();
   }, []);
 
   const fetchBotAccounts = async () => {
-    console.log('fetchBotAccounts called');
     setIsLoading(true);
     setError(null);
     
     try {
-      console.log('Calling invoke get_bot_accounts...');
       const accounts = await invoke('get_bot_accounts');
-      console.log('API call successful, accounts:', accounts);
       setBotAccounts(accounts || []);
     } catch (error) {
       console.error('API call failed:', error);
       setError(`APIエラー: ${error.toString()}`);
     } finally {
-      console.log('Setting loading to false');
       setIsLoading(false);
     }
   };
 
   const fetchReplySettings = async () => {
     try {
-      console.log('Fetching reply settings...');
       const settings = await invoke('get_reply_settings');
-      console.log('Reply settings loaded:', settings);
       setReplySettings(settings || []);
     } catch (error) {
       console.error('Failed to fetch reply settings:', error);
@@ -91,7 +82,6 @@ function BotManagement({ onUpdate, userSettings }) {
   };
 
   const openAddModal = () => {
-    console.log('Opening add modal');
     setCurrentBot({
       account_name: '',
       api_type: 'Free',
@@ -106,7 +96,6 @@ function BotManagement({ onUpdate, userSettings }) {
 
   // 新仕様：「返信」ボタンを押したBotが返信者として設定される
   const handleReply = (bot) => {
-    console.log('Opening reply settings modal for bot:', bot);
     setSelectedBotForReply(bot); // 返信するBot（このBotが自動返信する）
     setSelectedTargetBots([]); // 監視対象Botをリセット
     setReplyContent('');
@@ -114,13 +103,11 @@ function BotManagement({ onUpdate, userSettings }) {
   };
 
   const openConfigModal = async (bot) => {
-    console.log('Opening config modal for bot:', bot);
     setSelectedBotForConfig(bot);
     
     try {
       // Bot設定を取得
       const config = await invoke('get_bot_config', { accountId: bot.id });
-      console.log('Bot config loaded:', config);
       setCurrentConfig({
         ...config,
         tweet_templates: config.tweet_templates || '',
@@ -130,7 +117,6 @@ function BotManagement({ onUpdate, userSettings }) {
       // スケジュール投稿データを取得
       try {
         const scheduledTweets = await invoke('get_scheduled_tweets', { accountId: bot.id });
-        console.log('Scheduled tweets loaded:', scheduledTweets);
         
         if (scheduledTweets && scheduledTweets.length > 0) {
           // 最新のスケジュール投稿データを使用
@@ -186,7 +172,6 @@ function BotManagement({ onUpdate, userSettings }) {
   };
 
   const closeModal = () => {
-    console.log('Closing modals');
     setIsModalOpen(false);
     setIsConfigModalOpen(false);
     setIsTweetModalOpen(false);
@@ -271,7 +256,6 @@ function BotManagement({ onUpdate, userSettings }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting bot form:', { currentBot });
     
     // バリデーション
     if (!currentBot.account_name.trim()) {
@@ -296,13 +280,9 @@ function BotManagement({ onUpdate, userSettings }) {
     }
     
     try {
-      console.log('Adding new bot account...');
-      console.log('Bot data being sent:', currentBot);
       const result = await invoke('add_bot_account', { account: currentBot });
-      console.log('Add bot result:', result);
       alert('Botアカウントを追加しました！');
       
-      console.log('Bot account saved successfully');
       fetchBotAccounts();
       if (onUpdate) onUpdate();
       closeModal();
@@ -314,11 +294,6 @@ function BotManagement({ onUpdate, userSettings }) {
 
   const handleConfigSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting bot config:', {
-      scheduledTimes,
-      postContentList,
-      currentPostIndex
-    });
     
     // バリデーション
     if (scheduledTimes.length === 0) {
@@ -341,7 +316,6 @@ function BotManagement({ onUpdate, userSettings }) {
         contentList: validContentList
       });
       
-      console.log('Scheduled tweet list saved successfully');
       alert(`Bot設定を保存しました！\n\n投稿内容: ${validContentList.length}件\n投稿時間: ${scheduledTimes.length}件\n\n選択した時間に順番に自動投稿されます。`);
       fetchBotAccounts();
       if (onUpdate) onUpdate();
@@ -353,12 +327,9 @@ function BotManagement({ onUpdate, userSettings }) {
   };
 
   const handleDeleteBot = async (id) => {
-    console.log('Delete bot requested for ID:', id);
     if (window.confirm('このBotを削除してもよろしいですか？関連する設定とログも削除されます。')) {
       try {
-        console.log('Deleting bot account...');
         await invoke('delete_bot_account', { id });
-        console.log('Bot deleted successfully');
         fetchBotAccounts();
         if (onUpdate) onUpdate();
       } catch (error) {
@@ -370,13 +341,11 @@ function BotManagement({ onUpdate, userSettings }) {
 
   const toggleBotStatus = async (bot) => {
     const newStatus = bot.status === 'active' ? 'inactive' : 'active';
-    console.log(`Toggling bot status from ${bot.status} to ${newStatus}`);
     
     try {
       await invoke('update_bot_account', {
         account: { ...bot, status: newStatus }
       });
-      console.log('Bot status updated successfully');
       fetchBotAccounts();
       if (onUpdate) onUpdate();
     } catch (error) {
@@ -386,7 +355,6 @@ function BotManagement({ onUpdate, userSettings }) {
   };
 
   const handleTestTweet = async (botId, botName) => {
-    console.log(`Opening tweet modal for bot ID: ${botId}`);
     setSelectedBotForTweet({ id: botId, name: botName });
     setTweetContent('');
     setIsTweetModalOpen(true);
@@ -408,7 +376,6 @@ function BotManagement({ onUpdate, userSettings }) {
     setTestingBotId(selectedBotForTweet.id);
     
     try {
-      console.log('Sending tweet...');
       const result = await invoke('test_tweet', {
         request: {
           account_id: selectedBotForTweet.id,
@@ -416,7 +383,6 @@ function BotManagement({ onUpdate, userSettings }) {
         }
       });
       
-      console.log('Tweet result:', result);
       
       if (result.success) {
         alert(`✅ 投稿が成功しました！\n\nツイートID: ${result.tweet_id}\n\n「Bot実行ログ」ページで詳細を確認できます。`);
@@ -458,9 +424,6 @@ function BotManagement({ onUpdate, userSettings }) {
     }
     
     try {
-      console.log('Saving reply settings (new spec)...');
-      console.log('Reply bot:', selectedBotForReply);
-      console.log('Target bots:', selectedTargetBots);
       
       await invoke('save_reply_settings', {
         replyBotId: selectedBotForReply.id,          // 返信するBot（単一）
@@ -468,7 +431,6 @@ function BotManagement({ onUpdate, userSettings }) {
         replyContent: replyContent
       });
       
-      console.log('Reply settings saved successfully');
       alert(`✅ 返信設定を保存しました！\n\n返信Bot: ${selectedBotForReply.account_name}\n監視対象: ${selectedTargetBots.map(bot => bot.account_name).join(', ')}\n\n選択した監視対象が投稿するたびに、${selectedBotForReply.account_name}が自動返信します。`);
       
       fetchReplySettings();
@@ -484,7 +446,6 @@ function BotManagement({ onUpdate, userSettings }) {
     if (window.confirm('この返信設定を削除してもよろしいですか？')) {
       try {
         await invoke('delete_reply_settings', { id });
-        console.log('Reply settings deleted successfully');
         fetchReplySettings();
         if (onUpdate) onUpdate();
       } catch (error) {
@@ -528,18 +489,6 @@ function BotManagement({ onUpdate, userSettings }) {
     return badges[apiType] || badges['Free'];
   };
 
-  console.log('Current state:', { 
-    isLoading, 
-    error, 
-    botAccountsLength: botAccounts.length,
-    userSettingsMaxAccounts: userSettings?.max_accounts,
-    isModalOpen,
-    isConfigModalOpen,
-    isTweetModalOpen,
-    isReplyModalOpen,
-    selectedBotForReply: selectedBotForReply?.account_name,
-    selectedTargetBots: selectedTargetBots.map(bot => bot.account_name)
-  });
 
   if (error) {
     return (
@@ -616,7 +565,6 @@ function BotManagement({ onUpdate, userSettings }) {
         ) : (
           <div className="bot-grid">
             {botAccounts.map((bot) => {
-              console.log('Rendering bot:', bot);
               return (
                 <div key={bot.id} className="bot-card">
                   <div className="bot-header">
