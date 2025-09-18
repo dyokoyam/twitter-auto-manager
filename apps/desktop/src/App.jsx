@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { HashRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { FaUser, FaRobot, FaList, FaCog, FaTwitter } from 'react-icons/fa';
@@ -24,13 +24,15 @@ function App() {
 
   useEffect(() => {
     fetchDashboardData();
-    
-    // 30秒ごとに統計情報を更新
-    const interval = setInterval(fetchDashboardData, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
-  const fetchDashboardData = async () => {
+    // 30�b���Ƃɓ��v�����X�V
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
+
+  const fetchDashboardData = useCallback(async () => {
     try {
       setError(null);
       
@@ -39,24 +41,19 @@ function App() {
         invoke('get_user_settings')
       ]);
       
-      
       setDashboardStats(stats);
       setUserSettings(settings);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
       setError(error.toString());
-      
-      // エラー時のデフォルト値設定
-      if (!userSettings) {
-        setUserSettings({
-          plan_type: 'starter',
-          max_accounts: 1
-        });
-      }
+      setUserSettings(prev => prev ?? {
+        plan_type: 'starter',
+        max_accounts: 1
+      });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
 
   if (isLoading) {

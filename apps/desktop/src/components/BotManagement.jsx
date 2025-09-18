@@ -19,13 +19,6 @@ function BotManagement({ onUpdate, userSettings }) {
     access_token_secret: '',
     status: 'inactive'
   });
-  const [currentConfig, setCurrentConfig] = useState({
-    is_enabled: false,
-    auto_tweet_enabled: false,
-    tweet_interval_minutes: 60,
-    tweet_templates: '',
-    hashtags: ''
-  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [testingBotId, setTestingBotId] = useState(null);
@@ -106,15 +99,8 @@ function BotManagement({ onUpdate, userSettings }) {
     setSelectedBotForConfig(bot);
     
     try {
-      // Bot設定を取得
-      const config = await invoke('get_bot_config', { accountId: bot.id });
-      setCurrentConfig({
-        ...config,
-        tweet_templates: config.tweet_templates || '',
-        hashtags: config.hashtags || ''
-      });
-      
-      // スケジュール投稿データを取得
+      // Bot設定を取得    await invoke('get_bot_config', { accountId: bot.id });
+    // スケジュール投稿データを取得
       try {
         const scheduledTweets = await invoke('get_scheduled_tweets', { accountId: bot.id });
         
@@ -195,15 +181,6 @@ function BotManagement({ onUpdate, userSettings }) {
       [name]: type === 'checkbox' ? checked : value
     });
   };
-
-  const handleConfigChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setCurrentConfig({
-      ...currentConfig,
-      [name]: type === 'checkbox' ? checked : value
-    });
-  };
-
   const handleTimeChange = (time, checked) => {
     if (checked) {
       setScheduledTimes([...scheduledTimes, time]);
@@ -280,7 +257,7 @@ function BotManagement({ onUpdate, userSettings }) {
     }
     
     try {
-      const result = await invoke('add_bot_account', { account: currentBot });
+      await invoke('add_bot_account', { account: currentBot });
       alert('Botアカウントを追加しました！');
       
       fetchBotAccounts();

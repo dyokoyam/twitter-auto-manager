@@ -1,5 +1,5 @@
 // components/ExecutionLogs.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { FaFilter, FaTwitter, FaExclamationTriangle, FaInfoCircle, FaCheckCircle, FaSearch, FaList } from 'react-icons/fa';
 import './ExecutionLogs.css';
@@ -19,19 +19,21 @@ function ExecutionLogs() {
     fetchData();
     
     // 30秒ごとにログを更新
-    const interval = setInterval(fetchLogs, 30000);
+    const interval = setInterval(() => {
+      fetchLogs();
+    }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData, fetchLogs]);
 
   useEffect(() => {
     applyFilters();
-  }, [logs, selectedAccount, selectedLogLevel, searchTerm]);
+  }, [applyFilters]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     await Promise.all([fetchLogs(), fetchBotAccounts()]);
-  };
+  }, [fetchLogs, fetchBotAccounts]);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
       const logData = await invoke('get_execution_logs', { 
@@ -41,39 +43,36 @@ function ExecutionLogs() {
       setLogs(logData || []);
     } catch (error) {
       console.error('Failed to fetch logs:', error);
-      setLogs([]); // エラー時は空配列
+      setLogs([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchBotAccounts = async () => {
+  const fetchBotAccounts = useCallback(async () => {
     try {
       const accounts = await invoke('get_bot_accounts');
       setBotAccounts(accounts || []);
     } catch (error) {
       console.error('Failed to fetch bot accounts:', error);
-      setBotAccounts([]); // エラー時は空配列
+      setBotAccounts([]);
     }
-  };
+  }, []);
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = logs;
 
-    // アカウントフィルター
     if (selectedAccount) {
-      filtered = filtered.filter(log => log.account_id === parseInt(selectedAccount));
+      filtered = filtered.filter(log => log.account_id === parseInt(selectedAccount, 10));
     }
 
-    // ログレベルフィルター
     if (selectedLogLevel) {
       filtered = filtered.filter(log => log.status === selectedLogLevel);
     }
 
-    // 検索フィルター
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(log => 
+      filtered = filtered.filter(log =>
         log.message.toLowerCase().includes(term) ||
         (log.tweet_content && log.tweet_content.toLowerCase().includes(term))
       );
@@ -81,7 +80,7 @@ function ExecutionLogs() {
 
     setFilteredLogs(filtered);
     setCurrentPage(1);
-  };
+  }, [logs, selectedAccount, selectedLogLevel, searchTerm]);
 
   const getAccountName = (accountId) => {
     const account = botAccounts.find(acc => acc.id === accountId);
