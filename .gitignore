@@ -124,3 +124,5 @@ Thumbs.db
 
 # Monorepo runtime data
 var/
+# Local exported GitHub Actions configuration
+config/actions/github-config.json
