@@ -56,8 +56,7 @@ out/
 
 # Tauri (Rust backend)
 **/src-tauri/target/
-target/
-src-tauri/gen/
+**/src-tauri/gen/
 ## Keep Cargo.lock for binaries (do not ignore)
 
 # Package manager state
