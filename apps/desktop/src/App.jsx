@@ -22,16 +22,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchDashboardData();
-
-    // 30�b���Ƃɓ��v�����X�V
-    const interval = setInterval(() => {
-      fetchDashboardData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchDashboardData]);
-
   const fetchDashboardData = useCallback(async () => {
     try {
       setError(null);
@@ -54,6 +44,16 @@ function App() {
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+
+    // 30�b���Ƃɓ��v�����X�V
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
 
 
   if (isLoading) {
