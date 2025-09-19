@@ -1,80 +1,92 @@
 #!/usr/bin/env node
 
-import { runtime as config, loadConfig, saveConfig } from "./shared/config.js";
-import { logger as log } from "./shared/logger.js";
-import { createTwitterClient } from "./shared/twitter-client.js";
+import type { ActionsConfig, Account, ReplySettings } from '@tam/shared';
+import { runtime as config, loadConfig, saveConfig } from './shared/config.js';
+import { logger as log } from './shared/logger.js';
+import { createTwitterClient } from './shared/twitter-client.js';
+import { delay, formatJapanDateTime } from './shared/time.js';
 
-type BotAccount = {
-  id?: number | string;
-  account_name: string;
-  status?: string;
+type ReplyWorkerSetting = ReplySettings & { is_active?: boolean };
+
+type LastCheckedMap = Map<string, string>;
+
+type ReplyResult = {
+  successCount: number;
+  errorCount: number;
 };
 
-type ReplySetting = {
-  reply_bot_id: number | string;
-  target_bot_ids: string;
-  reply_content: string;
-  last_checked_tweet_ids?: string | null;
+const REPLY_DELAY_MS = 1000;
+
+const buildAccountIndex = (configData: ActionsConfig) => {
+  const index = new Map<string, Account>();
+  for (const bot of configData.bots ?? []) {
+    const account = bot.account;
+    const key = account?.id;
+    if (!account || key === undefined || key === null) {
+      continue;
+    }
+    index.set(String(key), account);
+  }
+  return index;
 };
 
-const PAUSE_MS = 1000;
+const parseLastCheckedMap = (setting: ReplyWorkerSetting): LastCheckedMap => {
+  const map: LastCheckedMap = new Map();
+  if (!setting.last_checked_tweet_ids) {
+    return map;
+  }
 
-function getJapanTime(): string {
-  return new Date().toLocaleString("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function findAccount(configData: any, targetId: number | string): BotAccount | null {
-  const id = Number(targetId);
-  if (Number.isNaN(id)) return null;
-  const match = (configData.bots || []).find((entry: any) => Number(entry?.account?.id) === id);
-  return match?.account ?? null;
-}
-
-function parseLastCheckedMap(setting: ReplySetting): Map<string, string> {
-  const map = new Map<string, string>();
-  if (!setting.last_checked_tweet_ids) return map;
   try {
-    const entries = JSON.parse(setting.last_checked_tweet_ids) as string[];
-    for (const token of entries) {
-      const [key, value] = String(token).split(":");
-      if (key && value) map.set(key, value);
+    const tokens = JSON.parse(setting.last_checked_tweet_ids) as string[];
+    for (const token of tokens) {
+      const [key, value] = String(token).split(':');
+      if (key && value) {
+        map.set(key, value);
+      }
     }
   } catch (error) {
     log.warn(`Failed to parse last_checked_tweet_ids: ${(error as Error).message}`);
   }
+
   return map;
-}
+};
 
-function serializeLastCheckedMap(map: Map<string, string>): string {
-  return JSON.stringify([...map.entries()].map(([key, value]) => `${key}:${value}`));
-}
+const serializeLastCheckedMap = (map: LastCheckedMap) =>
+  JSON.stringify([...map.entries()].map(([key, value]) => `${key}:${value}`));
 
-async function postReply(client: any, content: string, tweetId: string, botName: string) {
+const parseTargetIds = (payload: string) => {
+  try {
+    const parsed = JSON.parse(payload);
+    if (!Array.isArray(parsed)) {
+      return [] as string[];
+    }
+    return parsed.map((id) => String(id)).filter(Boolean);
+  } catch (error) {
+    log.warn(`Failed to parse target_bot_ids: ${(error as Error).message}`);
+    return [] as string[];
+  }
+};
+
+const postReply = async (client: any, content: string, tweetId: string, botName: string) => {
   if (config.dryRun) {
-    log.info(`[DRY RUN] Would reply for ${botName} to ${tweetId}: "${content}"`);
-    return { success: true };
+    log.info(`[dry-run] reply for ${botName} -> ${tweetId}: "${content}"`);
+    return { success: true } as const;
   }
 
   try {
     const response = await client.v2.tweet(content, { reply: { in_reply_to_tweet_id: tweetId } });
-    if (!response?.data) throw new Error("No data in response");
-    log.info(`✉️ Replied for ${botName}: ${response.data.id}`);
-    return { success: true };
+    if (!response?.data) {
+      throw new Error('Empty response from Twitter API');
+    }
+    log.info(`[posted] reply for ${botName}: ${response.data.id}`);
+    return { success: true } as const;
   } catch (error: any) {
     log.error(`Failed to post reply for ${botName}: ${error?.message}`);
-    return { success: false };
+    return { success: false } as const;
   }
-}
+};
 
-async function getLatestTweetId(client: any, username: string, sinceId?: string | null): Promise<string | null> {
+const getLatestTweetId = async (client: any, username: string, sinceId?: string | null) => {
   if (config.dryRun) {
     return sinceId ? null : `dry_run_tweet_${Date.now()}`;
   }
@@ -88,86 +100,113 @@ async function getLatestTweetId(client: any, username: string, sinceId?: string 
 
     const options: Record<string, unknown> = {
       max_results: 5,
-      "tweet.fields": ["created_at", "conversation_id", "author_id"],
-      exclude: "retweets,replies",
+      'tweet.fields': ['created_at', 'conversation_id', 'author_id'],
+      exclude: 'retweets,replies',
     };
-    if (sinceId) options.since_id = sinceId;
+    if (sinceId) {
+      options.since_id = sinceId;
+    }
 
     const timeline = await client.v2.userTimeline(userResponse.data.id, options);
     const tweets: any[] = timeline?.data?.data ?? timeline?.data ?? [];
-    return tweets.length > 0 ? String(tweets[0]?.id ?? "") : null;
+    const latest = tweets.find((item) => item?.id);
+    return latest ? String(latest.id) : null;
   } catch (error: any) {
     log.error(`Failed fetching tweets for ${username}: ${error?.message}`);
     return null;
   }
-}
+};
 
-async function processReplies(configData: any) {
-  const settings = (configData.reply_settings || []).filter((item: ReplySetting & { is_active?: boolean }) => item?.is_active);
+const processReplies = async (configData: ActionsConfig): Promise<ReplyResult> => {
+  const accountIndex = buildAccountIndex(configData);
+  const settings = (configData.reply_settings ?? []) as ReplyWorkerSetting[];
 
   let successCount = 0;
   let errorCount = 0;
-  let configUpdated = false;
+  let shouldPersist = false;
 
   for (const setting of settings) {
-    const replyBot = findAccount(configData, setting.reply_bot_id);
-    if (!replyBot || replyBot.status === "inactive") continue;
+    const isActive = setting?.is_active !== false;
+    if (!isActive) {
+      continue;
+    }
 
-    const replyClient = createTwitterClient(replyBot);
-    const targets: number[] = JSON.parse(setting.target_bot_ids || "[]");
-    const lastMap = parseLastCheckedMap(setting);
+    const replyAccount = accountIndex.get(String(setting.reply_bot_id));
+    if (!replyAccount || replyAccount.status === 'inactive') {
+      continue;
+    }
 
-    for (const targetId of targets) {
-      const targetAccount = findAccount(configData, targetId);
-      if (!targetAccount) continue;
+    let client: any;
+    try {
+      client = createTwitterClient(replyAccount);
+    } catch (error: any) {
+      log.error(`Missing credentials for ${replyAccount.account_name}: ${error?.message}`);
+      errorCount++;
+      continue;
+    }
 
-      const sinceId = lastMap.get(String(targetId));
-      const latestId = await getLatestTweetId(replyClient, targetAccount.account_name, sinceId);
-      if (!latestId || latestId === sinceId) continue;
+    const lastChecked = parseLastCheckedMap(setting);
+    const targetIds = parseTargetIds(setting.target_bot_ids || '[]');
+    let settingUpdated = false;
 
-      const result = await postReply(replyClient, setting.reply_content, latestId, replyBot.account_name);
+    for (const targetId of targetIds) {
+      const targetAccount = accountIndex.get(targetId);
+      if (!targetAccount) {
+        continue;
+      }
+
+      const sinceId = lastChecked.get(targetId);
+      const latestId = await getLatestTweetId(client, targetAccount.account_name, sinceId);
+      if (!latestId || latestId === sinceId) {
+        continue;
+      }
+
+      const result = await postReply(client, setting.reply_content, latestId, replyAccount.account_name);
       if (result.success) {
         successCount++;
-        lastMap.set(String(targetId), latestId);
-        configUpdated = true;
+        lastChecked.set(targetId, latestId);
+        settingUpdated = true;
       } else {
         errorCount++;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
+      if (!config.dryRun) {
+        await delay(REPLY_DELAY_MS);
+      }
     }
 
-    if (configUpdated) {
-      setting.last_checked_tweet_ids = serializeLastCheckedMap(lastMap);
+    if (settingUpdated) {
+      setting.last_checked_tweet_ids = serializeLastCheckedMap(lastChecked);
+      shouldPersist = true;
     }
   }
 
-  if (configUpdated) {
-    log.info("💾 Saving updated reply settings...");
+  if (shouldPersist) {
+    log.info('[persist] saving updated reply settings');
     saveConfig(configData);
   }
 
   return { successCount, errorCount };
-}
+};
 
-async function main() {
-  log.info("🚀 Starting Twitter Auto Manager - REPLY MONITOR (TS)");
-  log.info(`📊 Env: ${process.env.NODE_ENV || "production"} | Dry run: ${config.dryRun}`);
-  log.info(`⏰ JST time: ${getJapanTime()}`);
+const main = async () => {
+  log.info('[init] Twitter Auto Manager - reply monitor worker');
+  log.info(`[env] node=${process.version} | NODE_ENV=${process.env.NODE_ENV || 'production'} | dryRun=${config.dryRun}`);
+  log.info(`[time] JST ${formatJapanDateTime()}`);
 
   const cfg = loadConfig();
   if (!cfg) {
-    log.error("No configuration found");
+    log.error('No configuration found');
     process.exit(1);
     return;
   }
 
-  const result = await processReplies(cfg);
-  log.info(`💬 Result: ${result.successCount} success, ${result.errorCount} errors`);
-  if (result.errorCount > 0) process.exit(1);
-}
+  const { successCount, errorCount } = await processReplies(cfg);
+  log.info(`[result] success=${successCount} error=${errorCount}`);
+  if (errorCount > 0) process.exit(1);
+};
 
 main().catch((error: any) => {
-  log.error(`💥 Script failed: ${error?.message}`);
+  log.error(`Worker failed: ${error?.message}`);
   process.exit(1);
 });

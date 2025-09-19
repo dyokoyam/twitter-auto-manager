@@ -1,132 +1,154 @@
 #!/usr/bin/env node
 
+import type { ActionsConfig, Bot } from '@tam/shared';
 import { runtime as config, loadConfig, saveConfig } from './shared/config.js';
 import { logger as log } from './shared/logger.js';
 import { createTwitterClient } from './shared/twitter-client.js';
-import { updatePostIndexWithMemory } from './shared/persistence.js';
+import { delay, formatJapanDateTime, formatJapanHourMinute } from './shared/time.js';
 
-function getJapanTime(): string {
-  return new Date().toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
+const POST_DELAY_MS = 1000;
 
-function shouldPostNow(scheduledTimes?: string | null): boolean {
-  if (!scheduledTimes) return false;
-  const parts = scheduledTimes.split(',').map((s) => s.trim()).filter(Boolean);
-  if (parts.length === 0) return false;
-  const currentTime = new Date().toLocaleString('en-GB', {
-    timeZone: 'Asia/Tokyo',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const currentHour = currentTime.split(':')[0];
-  const scheduledHours = parts.map((p) => p.split(':')[0]);
-  return scheduledHours.includes(currentHour);
-}
+const parseScheduledTimes = (input?: string | null) => {
+  if (!input) return [] as string[];
+  return input
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean);
+};
 
-function getPostContentWithMemoryIndex(botConfig: any, memoryIndices: Map<string, number>, accountName: string) {
-  if (botConfig.scheduled_content_list) {
+const shouldPostNow = (scheduledTimes?: string | null) => {
+  const slots = parseScheduledTimes(scheduledTimes);
+  if (slots.length === 0) return false;
+  return slots.includes(formatJapanHourMinute());
+};
+
+type NextContent = {
+  content: string;
+  nextIndex?: number;
+};
+
+const resolveNextContent = (bot: Bot): NextContent | null => {
+  if (bot.scheduled_content_list) {
     try {
-      const contentList = typeof botConfig.scheduled_content_list === 'string'
-        ? JSON.parse(botConfig.scheduled_content_list)
-        : botConfig.scheduled_content_list;
-      if (!Array.isArray(contentList) || contentList.length === 0) return null;
-      const currentIndex = memoryIndices.has(accountName)
-        ? (memoryIndices.get(accountName) as number)
-        : (botConfig.current_index || 0);
-      const safeIndex = currentIndex % contentList.length;
+      const list =
+        typeof bot.scheduled_content_list === 'string'
+          ? JSON.parse(bot.scheduled_content_list)
+          : bot.scheduled_content_list;
+
+      if (!Array.isArray(list) || list.length === 0) {
+        return null;
+      }
+
+      const currentIndex =
+        typeof bot.current_index === 'number' && bot.current_index >= 0
+          ? bot.current_index
+          : 0;
+
+      const safeIndex = currentIndex % list.length;
+      const content = String(list[safeIndex]).trim();
+      if (!content) {
+        return null;
+      }
+
       return {
-        content: contentList[safeIndex],
-        isFromList: true,
-        currentIndex,
-        listLength: contentList.length,
+        content,
+        nextIndex: (safeIndex + 1) % list.length,
       };
-    } catch (e: any) {
-      log.error(`Failed to parse content list for ${accountName}: ${e?.message}`);
+    } catch (error) {
+      log.error(
+        `Failed to parse scheduled_content_list for ${bot.account?.account_name ?? 'unknown'}: ${
+          (error as Error).message
+        }`,
+      );
       return null;
     }
   }
-  if (botConfig.scheduled_content) {
-    return { content: botConfig.scheduled_content, isFromList: false };
-  }
-  return null;
-}
 
-async function postTweet(client: any, content: string, botName: string) {
+  const single = bot.scheduled_content?.trim();
+  return single ? { content: single } : null;
+};
+
+const postTweet = async (client: any, content: string, botName: string) => {
+  if (config.dryRun) {
+    log.info(`[dry-run] tweet for ${botName}: "${content}"`);
+    return { success: true, data: { id: `dry_run_${Date.now()}`, text: content } } as const;
+  }
+
   try {
-    if (config.dryRun) {
-      log.info(`[DRY RUN] Would post tweet for ${botName}: "${content}"`);
-      return { data: { id: 'dry_run_' + Date.now(), text: content }, success: true };
+    const response = await client.v2.tweet(content);
+    if (!response?.data) {
+      throw new Error('Empty response from Twitter API');
     }
-    const res = await client.v2.tweet(content);
-    if (res?.data) {
-      log.info(`✁EPosted tweet for ${botName}: ${res.data.id}`);
-      return { ...res, success: true };
-    }
-    throw new Error('No data in response');
-  } catch (e: any) {
-    log.error(`Failed to post tweet for ${botName}: ${e?.message}`);
-    return { success: false, error: e?.message };
+    log.info(`[posted] tweet for ${botName}: ${response.data.id}`);
+    return { success: true, data: response.data } as const;
+  } catch (error: any) {
+    log.error(`Failed to post tweet for ${botName}: ${error?.message}`);
+    return { success: false, error: error?.message } as const;
   }
-}
+};
 
-async function processScheduledPosts(configData: any) {
-  const memoryIndices = new Map<string, number>();
+const processScheduledPosts = async (configData: ActionsConfig) => {
   let successCount = 0;
   let errorCount = 0;
-  let configUpdated = false;
+  let shouldPersist = false;
 
-  for (let botIndex = 0; botIndex < (configData.bots || []).length; botIndex++) {
-    const bot = configData.bots[botIndex];
-    const account = bot?.account;
-    if (!account || account.status !== 'active') continue;
+  const bots = configData.bots ?? [];
 
-    try {
-      const scheduledTimes = bot.scheduled_times as string | null;
-      if (!shouldPostNow(scheduledTimes)) continue;
+  for (let index = 0; index < bots.length; index++) {
+    const bot = bots[index];
+    const account = bot.account;
 
-      const contentInfo = getPostContentWithMemoryIndex(bot, memoryIndices, account.account_name);
-      if (!contentInfo) continue;
-
-      const client = createTwitterClient(account);
-      const result = await postTweet(client, contentInfo.content, account.account_name);
-      if (result.success) {
-        successCount++;
-        if (contentInfo.isFromList) {
-          const updated = updatePostIndexWithMemory(configData, botIndex, memoryIndices, account.account_name);
-          if (updated) configUpdated = true;
-        }
-      } else {
-        errorCount++;
-      }
-    } catch (e: any) {
-      errorCount++;
-      log.error(`Error processing ${account?.account_name || 'unknown'}: ${e?.message}`);
+    if (!account || account.status !== 'active') {
+      continue;
     }
 
-    await new Promise((r) => setTimeout(r, 1000));
+    if (!shouldPostNow(bot.scheduled_times ?? null)) {
+      continue;
+    }
+
+    const nextContent = resolveNextContent(bot);
+    if (!nextContent) {
+      continue;
+    }
+
+    let client: any;
+    try {
+      client = createTwitterClient(account);
+    } catch (error: any) {
+      log.error(`Missing credentials for ${account.account_name}: ${error?.message}`);
+      errorCount++;
+      continue;
+    }
+
+    const result = await postTweet(client, nextContent.content, account.account_name);
+    if (result.success) {
+      successCount++;
+
+      if (typeof nextContent.nextIndex === 'number') {
+        bots[index].current_index = nextContent.nextIndex;
+        shouldPersist = true;
+      }
+    } else {
+      errorCount++;
+    }
+
+    if (!config.dryRun) {
+      await delay(POST_DELAY_MS);
+    }
   }
 
-  if (configUpdated) {
-    log.info(`💾 Saving updated config indices...`);
+  if (shouldPersist) {
+    log.info('[persist] saving updated bot indices');
     saveConfig(configData);
   }
 
   return { successCount, errorCount };
-}
+};
 
-async function main() {
-  log.info('🚀 Starting Twitter Auto Manager - SCHEDULED POSTS (TS)');
-  log.info(`📊 Env: ${process.env.NODE_ENV || 'production'} | Dry run: ${config.dryRun}`);
-  log.info(`⏰ JST time: ${getJapanTime()}`);
+const main = async () => {
+  log.info('[init] Twitter Auto Manager - scheduled posts worker');
+  log.info(`[env] node=${process.version} | NODE_ENV=${process.env.NODE_ENV || 'production'} | dryRun=${config.dryRun}`);
+  log.info(`[time] JST ${formatJapanDateTime()}`);
 
   const cfg = loadConfig();
   if (!cfg || !cfg.bots || cfg.bots.length === 0) {
@@ -135,13 +157,12 @@ async function main() {
     return;
   }
 
-  const res = await processScheduledPosts(cfg);
-  log.info(`📈 Result: ${res.successCount} success, ${res.errorCount} errors`);
-  if (res.errorCount > 0) process.exit(1);
-}
+  const { successCount, errorCount } = await processScheduledPosts(cfg);
+  log.info(`[result] success=${successCount} error=${errorCount}`);
+  if (errorCount > 0) process.exit(1);
+};
 
-main().catch((e) => {
-  log.error(`💥 Script failed: ${e?.message}`);
+main().catch((error: any) => {
+  log.error(`Worker failed: ${error?.message}`);
   process.exit(1);
 });
-
