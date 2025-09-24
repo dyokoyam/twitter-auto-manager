@@ -1,0 +1,28 @@
+﻿{
+    "private":  true,
+    "workspaces":  [
+                       "apps/desktop",
+                       "apps/workers/twitter",
+                       "packages/shared"
+                   ],
+    "name":  "twitter-auto-manager-monorepo",
+    "version":  "0.1.0",
+    "scripts":  {
+                    "dev:desktop":  "npm run dev -w apps/desktop",
+                    "worker:posts":  "npm run post-tweets -w apps/workers/twitter",
+                    "build:desktop":  "npm run build -w apps/desktop",
+                    "tauri:build":  "npm run tauri:build -w apps/desktop",
+                    "worker:replies":  "npm run reply-monitor -w apps/workers/twitter",
+                    "tauri":  "npm run tauri -w apps/desktop",
+                    "build:workers":  "npm run build -w apps/workers/twitter",
+                    "build:shared":  "npm run build -w packages/shared",
+                    "build:all":  "npm run build:shared \u0026\u0026 npm run build:workers",
+                    "config:merge":  "node config/actions/scripts/merge-config.js",
+                    "config:split":  "node config/actions/scripts/split-config.js"
+                },
+    "devDependencies":  {
+                            "eslint":  "^8.57.1",
+                            "@typescript-eslint/eslint-plugin":  "^6.21.0",
+                            "@typescript-eslint/parser":  "^6.21.0"
+                        }
+}

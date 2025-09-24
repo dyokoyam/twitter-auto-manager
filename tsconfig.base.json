@@ -1,0 +1,19 @@
+﻿{
+    "compilerOptions":  {
+                            "target":  "ES2020",
+                            "module":  "NodeNext",
+                            "moduleResolution":  "NodeNext",
+                            "lib":  [
+                                        "ES2020"
+                                    ],
+                            "esModuleInterop":  true,
+                            "forceConsistentCasingInFileNames":  true,
+                            "skipLibCheck":  true,
+                            "paths":  {
+                                          "@tam/shared":  [
+                                                              "packages/shared/src/index.ts"
+                                                          ]
+                                      },
+                            "baseUrl":  "."
+                        }
+}

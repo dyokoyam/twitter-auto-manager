@@ -1,0 +1,29 @@
+{
+    "name":  "twitter-auto-manager-scripts",
+    "version":  "0.2.0",
+    "type":  "module",
+    "private":  true,
+    "description":  "GitHub Actions scripts for Twitter Auto Manager (ÂàÅEõ¢ÁâÅE",
+    "scripts":  {
+                    "post-tweets":  "node dist/post-tweets.js",
+                    "reply-monitor":  "node dist/reply-monitor.js",
+                    "test:posts":  "NODE_ENV=development LOG_LEVEL=debug node dist/post-tweets.js",
+                    "test:replies":  "NODE_ENV=development LOG_LEVEL=debug node dist/reply-monitor.js",
+                    "dry-run:posts":  "DRY_RUN=true node dist/post-tweets.js",
+                    "dry-run:replies":  "DRY_RUN=true node dist/reply-monitor.js",
+                    "build":  "node -e \"require(\u0027fs\u0027).rmSync(\u0027./dist\u0027, { recursive: true, force: true });\" \u0026\u0026 tsc -p tsconfig.build.json",
+                    "lint":  "eslint src --ext .ts --max-warnings 0"
+                },
+    "dependencies":  {
+                         "twitter-api-v2":  "^1.23.2",
+                         "zod":  "^3.23.8",
+                         "@tam/shared":  "*"
+                     },
+    "engines":  {
+                    "node":  "\u003e=18.0.0"
+                },
+    "devDependencies":  {
+                            "@types/node":  "^22.7.4",
+                            "typescript":  "^5.6.3"
+                        }
+}

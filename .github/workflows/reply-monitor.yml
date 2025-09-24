@@ -1,0 +1,126 @@
+﻿name: Reply Monitor (Reply Processing Only)
+
+on:
+  schedule:
+    - cron: '30 0,2,4,6,8,10,12,14,16,18,20,22 * * *'  # 豈取凾30蛻・↓螳溯｡鯉ｼ・譎る俣縺斐→縲∬・蜍墓兜遞ｿ縺ｨ30蛻・★繧峨☆・・
+  workflow_dispatch:  # 謇句虚螳溯｡檎畑
+
+# GitHub Actions 縺ｫ譖ｸ縺崎ｾｼ縺ｿ讓ｩ髯舌ｒ莉倅ｸ・
+permissions:
+  contents: write
+
+jobs:
+  monitor_replies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 閾ｪ蜍輔さ繝溘ャ繝育畑縺ｫ繝医・繧ｯ繝ｳ繧定ｨｭ螳・
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install and build worker
+        run: |
+          npm ci
+          npm run build:shared
+          npm run build:workers
+
+      - name: Check for user config file
+        run: |
+          if [ -f "config/actions/user-config.json" ]; then
+            echo "笨・User config file found"
+            cat config/actions/user-config.json | jq '.reply_settings | length' || echo "User config exists but not valid JSON"
+          else
+            echo "笶・User config file not found. Please export configuration from Tauri app."
+            exit 1
+          fi
+
+      - name: Run reply monitor (Replies Only)
+        run: |
+          cd apps/workers/twitter  
+          node dist/reply-monitor.js
+        env:
+          # 霑比ｿ｡逶｣隕也畑險ｭ螳夲ｼ医ョ繝舌ャ繧ｰ繝｢繝ｼ繝牙ｼｷ蛹厄ｼ・
+          USER_CONFIG_PATH: ../../../config/actions/user-config.json
+          SYSTEM_STATE_PATH: ../../../config/actions/system-state.json
+          LOG_LEVEL: debug
+          NODE_ENV: production
+
+      # 売 險ｭ螳壹ヵ繧｡繧､繝ｫ縺ｮ閾ｪ蜍輔さ繝溘ャ繝茨ｼ郁ｿ比ｿ｡逶｣隕也憾諷区峩譁ｰ逕ｨ・・
+      - name: Check for system state changes
+        id: check_changes
+        run: |
+          if git diff --quiet config/actions/system-state.json; then
+            echo "No changes to system state"
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "System state has been updated"
+            echo "changes=true" >> $GITHUB_OUTPUT
+            
+            # 螟画峩蜀・ｮｹ繧偵Ο繧ｰ蜃ｺ蜉・
+            echo "Changes detected:"
+            git diff config/actions/system-state.json
+          fi
+
+      - name: Commit updated system state (Reply Monitoring)
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          # Git險ｭ螳・
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          
+          # 繧ｹ繝・・繧ｸ繝ｳ繧ｰ
+          git add config/actions/system-state.json
+          
+          # 繧ｳ繝溘ャ繝医Γ繝・そ繝ｼ繧ｸ縺ｫ譖ｴ譁ｰ蜀・ｮｹ繧貞性繧√ｋ
+          COMMIT_MSG="､・Auto-update: update reply monitoring status"
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          git commit -m "$COMMIT_MSG" -m "Updated at: $TIMESTAMP" -m "Updated by: GitHub Actions workflow (reply monitoring)"
+          
+          echo "笨・Configuration changes committed successfully"
+
+      - name: Push changes to repository
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          # 螟画峩繧偵・繝・す繝･
+          git push
+          echo "笨・Configuration changes pushed to repository"
+
+      - name: Upload logs as artifact (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reply-monitor-error-logs-${{ github.run_number }}
+          path: |
+            apps/workers/twitter/*.log
+            config/actions/github-config.json
+          retention-days: 7
+
+      # 剥 螳溯｡檎ｵ先棡繧ｵ繝槭Μ繝ｼ
+      - name: Reply Monitor Execution Summary
+        if: always()
+        run: |
+          echo "投 Reply Monitor Execution Summary"
+          echo "=================================="
+          echo "竢ｰ Execution Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          echo "売 Config Updated: ${{ steps.check_changes.outputs.changes }}"
+          
+          if [ -f "config/actions/system-state.json" ]; then
+            echo "塘 Current Reply Settings:"
+            jq '.reply_state[] | {reply_bot_id: .reply_bot_id, last_checked: .last_checked_tweet_ids}' config/actions/system-state.json 2>/dev/null || echo "System state exists but format issue"
+          fi
+          
+          echo "識 Function: Reply Monitoring Only"
+          echo "搭 Next: Scheduled posts run separately"
+          echo "=================================="
+
+
+
+
+

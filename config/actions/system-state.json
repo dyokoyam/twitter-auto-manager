@@ -1,0 +1,92 @@
+{
+  "version": "1.0",
+  "updated_at": "2025-09-24T10:57:53.646116300+00:00",
+  "bot_state": [
+    {
+      "account_id": 44,
+      "account_name": "z8rm7",
+      "current_index": 0
+    },
+    {
+      "account_id": 43,
+      "account_name": "z8rm4",
+      "current_index": 0
+    },
+    {
+      "account_id": 37,
+      "account_name": "z7rm2",
+      "current_index": 0
+    },
+    {
+      "account_id": 34,
+      "account_name": "z6rm5",
+      "current_index": 0
+    },
+    {
+      "account_id": 32,
+      "account_name": "z6rm3",
+      "current_index": 0
+    },
+    {
+      "account_id": 20,
+      "account_name": "z5rm1",
+      "current_index": 0
+    },
+    {
+      "account_id": 18,
+      "account_name": "z4rm6",
+      "current_index": 0
+    },
+    {
+      "account_id": 16,
+      "account_name": "z4rm1",
+      "current_index": 0
+    },
+    {
+      "account_id": 15,
+      "account_name": "z3rm8",
+      "current_index": 0
+    },
+    {
+      "account_id": 13,
+      "account_name": "z3rm5",
+      "current_index": 0
+    },
+    {
+      "account_id": 11,
+      "account_name": "z2rm9",
+      "current_index": 0
+    },
+    {
+      "account_id": 10,
+      "account_name": "z2rm8",
+      "current_index": 0
+    },
+    {
+      "account_id": 9,
+      "account_name": "z2rm6",
+      "current_index": 0
+    },
+    {
+      "account_id": 8,
+      "account_name": "z2rm4",
+      "current_index": 0
+    },
+    {
+      "account_id": 7,
+      "account_name": "z1rm9",
+      "current_index": 0
+    },
+    {
+      "account_id": 6,
+      "account_name": "z1rm8",
+      "current_index": 0
+    },
+    {
+      "account_id": 5,
+      "account_name": "z1rm6",
+      "current_index": 0
+    }
+  ],
+  "reply_state": []
+}

@@ -1,0 +1,37 @@
+name: Workers CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+concurrency:
+  group: workers-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  NODE_ENV: test
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node
+        with:
+          node-version: 18
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint (workers)
+        run: npm run lint -w apps/workers/twitter
+      - name: Type check (workers)
+        run: npx tsc -p apps/workers/twitter/tsconfig.json --noEmit
+      - name: Build shared package
+        run: npm run build:shared
+      - name: Build worker bundle
+        run: npm run build:workers

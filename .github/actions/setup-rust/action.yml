@@ -1,0 +1,23 @@
+name: "Setup Rust"
+description: "Setup Rust toolchain with caching"
+inputs:
+  toolchain:
+    description: "Rust toolchain channel"
+    required: false
+    default: "stable"
+  target:
+    description: "Additional rustup target"
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: "${{ inputs.toolchain }}"
+        targets: "${{ inputs.target }}"
+    - name: Cache cargo artifacts
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true

@@ -1,0 +1,20 @@
+name: "Setup Node"
+description: "Setup Node.js with caching"
+inputs:
+  node-version:
+    description: "Node.js version"
+    required: false
+    default: "18"
+  cache-dependency-path:
+    description: "Paths for npm cache dependency files"
+    required: false
+    default: "**/package-lock.json"
+runs:
+  using: "composite"
+  steps:
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "${{ inputs.node-version }}"
+        cache: npm
+        cache-dependency-path: "${{ inputs.cache-dependency-path }}"

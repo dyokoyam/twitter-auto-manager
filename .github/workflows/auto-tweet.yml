@@ -1,0 +1,124 @@
+﻿name: Auto Tweet Poster (Scheduled Posts Only)
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # 豈取凾0蛻・↓螳溯｡鯉ｼ・譎る俣縺斐→・・
+  workflow_dispatch:  # 謇句虚螳溯｡檎畑
+
+# GitHub Actions 縺ｫ譖ｸ縺崎ｾｼ縺ｿ讓ｩ髯舌ｒ莉倅ｸ・
+permissions:
+  contents: write
+
+jobs:
+  post_tweets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 閾ｪ蜍輔さ繝溘ャ繝育畑縺ｫ繝医・繧ｯ繝ｳ繧定ｨｭ螳・
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install and build worker
+        run: |
+          npm ci
+          npm run build:shared
+          npm run build:workers
+
+      - name: Check for user config file
+        run: |
+          if [ -f "config/actions/user-config.json" ]; then
+            echo "笨・User config file found"
+            cat config/actions/user-config.json | jq '.bots | length' || echo "User config exists but not valid JSON"
+          else
+            echo "笶・User config file not found. Please export configuration from Tauri app."
+            exit 1
+          fi
+
+      - name: Run scheduled tweet poster (Posts Only)
+        run: |
+          cd apps/workers/twitter  
+          node dist/post-tweets.js
+        env:
+          # 繧ｹ繧ｱ繧ｸ繝･繝ｼ繝ｫ謚慕ｨｿ逕ｨ險ｭ螳・
+          USER_CONFIG_PATH: ../../../config/actions/user-config.json
+          SYSTEM_STATE_PATH: ../../../config/actions/system-state.json
+          LOG_LEVEL: info
+          NODE_ENV: production
+
+      # 売 險ｭ螳壹ヵ繧｡繧､繝ｫ縺ｮ閾ｪ蜍輔さ繝溘ャ繝茨ｼ域兜遞ｿ繧､繝ｳ繝・ャ繧ｯ繧ｹ譖ｴ譁ｰ逕ｨ・・
+      - name: Check for system state changes
+        id: check_changes
+        run: |
+          if git diff --quiet config/actions/system-state.json; then
+            echo "No changes to system state"
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "System state has been updated"
+            echo "changes=true" >> $GITHUB_OUTPUT
+            
+            # 螟画峩蜀・ｮｹ繧偵Ο繧ｰ蜃ｺ蜉・
+            echo "Changes detected:"
+            git diff config/actions/system-state.json
+          fi
+
+      - name: Commit updated system state (Post Indices)
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          # Git險ｭ螳・
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          
+          # 繧ｹ繝・・繧ｸ繝ｳ繧ｰ
+          git add config/actions/system-state.json
+          
+          # 繧ｳ繝溘ャ繝医Γ繝・そ繝ｼ繧ｸ縺ｫ譖ｴ譁ｰ蜀・ｮｹ繧貞性繧√ｋ
+          COMMIT_MSG="､・Auto-update: advance post indices for scheduled tweets"
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          git commit -m "$COMMIT_MSG" -m "Updated at: $TIMESTAMP" -m "Updated by: GitHub Actions workflow (scheduled posts)"
+          
+          echo "笨・Configuration changes committed successfully"
+
+      - name: Push changes to repository
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          # 螟画峩繧偵・繝・す繝･
+          git push
+          echo "笨・Configuration changes pushed to repository"
+
+      - name: Upload logs as artifact (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduled-posts-error-logs-${{ github.run_number }}
+          path: |
+            apps/workers/twitter/*.log
+            config/actions/github-config.json
+          retention-days: 7
+
+      # 剥 螳溯｡檎ｵ先棡繧ｵ繝槭Μ繝ｼ
+      - name: Scheduled Posts Execution Summary
+        if: always()
+        run: |
+          echo "投 Scheduled Posts Execution Summary"
+          echo "===================================="
+          echo "竢ｰ Execution Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          echo "売 Config Updated: ${{ steps.check_changes.outputs.changes }}"
+          
+          if [ -f "config/actions/system-state.json" ]; then
+            echo "塘 Current Config Status:"
+            jq '.bot_state[] | {account: (.account_name // "unknown"), current_index: .current_index}' config/actions/system-state.json 2>/dev/null || echo "System state exists but format issue"
+          fi
+          
+          echo "識 Function: Scheduled Posts Only"
+          echo "搭 Next: Reply monitoring runs separately"
+          echo "===================================="
+
+
+

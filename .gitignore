@@ -1,0 +1,125 @@
+###############################################
+# Node.js / JavaScript project .gitignore
+# Covers common tools, frameworks, and caches
+###############################################
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data / PIDs
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+storybook-static/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# Caches
+.cache/
+.parcel-cache/
+.eslintcache
+.rpt2_cache/
+.vite/
+.turbo/
+
+# Frameworks
+.next/
+out/
+.nuxt/
+.output/
+.svelte-kit/
+.vuepress/dist/
+# If using Gatsby, 'public/' is generated at build time
+# public/
+.vercel/
+.netlify/
+
+# Tauri (Rust backend)
+**/src-tauri/target/
+**/src-tauri/gen/
+## Keep Cargo.lock for binaries (do not ignore)
+
+# Package manager state
+.npm/
+.yarn-integrity
+.pnpm-store/
+.pnp.*
+# Yarn 2 (Berry)
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# Environment files (keep examples)
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# SQLite databases and journals
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.sqlite-journal
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+# Common project location for DBs
+data/**/*.db
+data/**/*.sqlite*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Code signing material (never commit to VCS)
+*.pfx
+*.p12
+*.cer
+*.crt
+*.der
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+*.keystore
+
+# Misc
+*.sw?
+*.local
+*.tgz
+\.tern-port
+
+# Local exported GitHub Actions configuration
+config/actions/github-config.json
