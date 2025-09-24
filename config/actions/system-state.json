@@ -1,6 +1,4 @@
 {
-  "version": "1.0",
-  "updated_at": "2025-09-24T10:57:53.646116300+00:00",
   "bot_state": [
     {
       "account_id": 44,
@@ -15,7 +13,7 @@
     {
       "account_id": 37,
       "account_name": "z7rm2",
-      "current_index": 0
+      "current_index": 1
     },
     {
       "account_id": 34,
@@ -25,11 +23,16 @@
     {
       "account_id": 32,
       "account_name": "z6rm3",
-      "current_index": 0
+      "current_index": 1
     },
     {
       "account_id": 20,
       "account_name": "z5rm1",
+      "current_index": 0
+    },
+    {
+      "account_id": 19,
+      "account_name": "z4rm8",
       "current_index": 0
     },
     {
@@ -50,7 +53,7 @@
     {
       "account_id": 13,
       "account_name": "z3rm5",
-      "current_index": 0
+      "current_index": 1
     },
     {
       "account_id": 11,
@@ -88,5 +91,7 @@
       "current_index": 0
     }
   ],
-  "reply_state": []
+  "reply_state": [],
+  "version": "1.0",
+  "updated_at": "2025-09-24T11:48:50.786021700+00:00"
 }
