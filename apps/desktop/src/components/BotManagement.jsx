@@ -46,12 +46,16 @@ function BotManagement({ onUpdate, userSettings }) {
   });
 
   useEffect(() => {
-    fetchBotAccounts();
+    fetchBotAccounts({ showLoader: true });
     fetchReplySettings();
   }, []);
 
-  const fetchBotAccounts = async () => {
-    setIsLoading(true);
+  const fetchBotAccounts = async (options = {}) => {
+    const showLoader = options?.showLoader ?? false;
+
+    if (showLoader) {
+      setIsLoading(true);
+    }
     setError(null);
     
     try {
@@ -61,7 +65,11 @@ function BotManagement({ onUpdate, userSettings }) {
       console.error('API call failed:', error);
       setError(`APIエラー: ${error.toString()}`);
     } finally {
-      setIsLoading(false);
+      if (showLoader) {
+        setIsLoading(false);
+      } else {
+        setIsLoading((prev) => (prev ? false : prev));
+      }
     }
   };
 
@@ -483,7 +491,7 @@ function BotManagement({ onUpdate, userSettings }) {
             <p>{error}</p>
             <button 
               className="btn btn-primary" 
-              onClick={fetchBotAccounts}
+              onClick={() => fetchBotAccounts({ showLoader: true })}
               style={{ marginTop: '16px' }}
             >
               再試行
