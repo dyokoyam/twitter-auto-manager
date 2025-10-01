@@ -99,7 +99,7 @@ const getLatestTweetId = async (client: any, username: string, sinceId?: string 
     }
 
     const options: Record<string, unknown> = {
-      max_results: 5,
+      max_results: 1,
       'tweet.fields': ['created_at', 'conversation_id', 'author_id'],
       exclude: 'retweets,replies',
     };
